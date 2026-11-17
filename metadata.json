@@ -1,0 +1,6 @@
+{
+  "name": "Leia Rojas — Portafolio Web & Ajedrez",
+  "description": "Portafolio personal interactivo en neumorfismo oscuro de Leia Rojas: proyectos reales, ajedrez estratégico, pieza 3D en Three.js y fondo procedural interactivo.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
