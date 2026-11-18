@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { Component, type ReactNode, useState } from 'react';
 import {
   ArrowDownRight,
   ChevronDown,
@@ -8,14 +8,11 @@ import {
   Pause,
   Play,
   RotateCcw,
+  Sparkles,
 } from 'lucide-react';
 import { PROFILE_DATA } from '../data/portfolioData';
-import {
-  type ChessFinishKind,
-  type ChessPieceKind,
-  type ChessSceneController,
-  mountChessHeroScene,
-} from '../three/chessScene';
+import type { ChessFinishKind, ChessPieceKind } from '../three/chessScene';
+import { ChessHeroCanvas } from './three/ChessHeroCanvas';
 
 const PIECE_OPTIONS: { id: ChessPieceKind; label: string }[] = [
   { id: 'knight', label: 'Caballo' },
@@ -28,72 +25,55 @@ const FINISH_OPTIONS: { id: ChessFinishKind; label: string; swatchClass: string 
   { id: 'cyan_titanium', label: 'Titanio Cian', swatchClass: 'bg-cyan-400' },
 ];
 
-export function HeroSection() {
-  const canvasMountRef = useRef<HTMLDivElement | null>(null);
-  const controllerRef = useRef<ChessSceneController | null>(null);
+interface CanvasErrorBoundaryProps {
+  onError: () => void;
+  children: ReactNode;
+}
 
+class CanvasErrorBoundary extends Component<CanvasErrorBoundaryProps, { hasError: boolean }> {
+  state = { hasError: false };
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch() {
+    this.props.onError();
+  }
+
+  render() {
+    if (this.state.hasError) return null;
+    return this.props.children;
+  }
+}
+
+export function HeroSection() {
   const [piece, setPiece] = useState<ChessPieceKind>('knight');
   const [finish, setFinish] = useState<ChessFinishKind>('obsidian_gold');
   const [autoRotate, setAutoRotate] = useState(true);
+  const [particlesEnabled, setParticlesEnabled] = useState(true);
+  const [resetSignal, setResetSignal] = useState(0);
   const [dockOpen, setDockOpen] = useState(true);
   const [webglUnavailable, setWebglUnavailable] = useState(false);
-
-  useEffect(() => {
-    const mount = canvasMountRef.current;
-    if (!mount) return;
-
-    try {
-      const controller = mountChessHeroScene(mount, {
-        initialPiece: 'knight',
-        initialFinish: 'obsidian_gold',
-        initialAutoRotate: true,
-        onWebGLFallback: () => setWebglUnavailable(true),
-      });
-      controllerRef.current = controller;
-
-      return () => {
-        controller.dispose();
-        controllerRef.current = null;
-      };
-    } catch {
-      setWebglUnavailable(true);
-    }
-  }, []);
-
-  const handlePieceChange = (nextPiece: ChessPieceKind) => {
-    setPiece(nextPiece);
-    controllerRef.current?.setPiece(nextPiece);
-  };
-
-  const handleFinishChange = (nextFinish: ChessFinishKind) => {
-    setFinish(nextFinish);
-    controllerRef.current?.setFinish(nextFinish);
-  };
-
-  const handleToggleRotate = () => {
-    const next = !autoRotate;
-    setAutoRotate(next);
-    controllerRef.current?.setAutoRotate(next);
-  };
-
-  const handleResetCamera = () => {
-    controllerRef.current?.resetCamera();
-  };
 
   return (
     <section
       id="inicio"
       className="relative min-h-screen w-full overflow-hidden bg-[#16181d] flex items-center pt-24 pb-28"
     >
-      {/* Lienzo 3D aislado con atributo para morphing del cursor orbital */}
-      <div
-        ref={canvasMountRef}
-        data-testid="hero-3d-canvas"
-        data-cursor="orbit"
-        data-piece={piece}
-        data-finish={finish}
-        className="absolute inset-0 z-0 cursor-grab active:cursor-grabbing"
-      />
+      {/* Escena 3D en React Three Fiber con pieza procedural y partículas suaves */}
+      {!webglUnavailable && (
+        <CanvasErrorBoundary onError={() => setWebglUnavailable(true)}>
+          <ChessHeroCanvas
+            piece={piece}
+            finish={finish}
+            autoRotate={autoRotate}
+            particlesEnabled={particlesEnabled}
+            resetSignal={resetSignal}
+            onWebGLFallback={() => setWebglUnavailable(true)}
+          />
+        </CanvasErrorBoundary>
+      )}
 
       {/* Respaldo elegante si WebGL no está disponible */}
       {webglUnavailable && (
@@ -176,7 +156,7 @@ export function HeroSection() {
         {dockOpen && (
           <div
             data-neu-climbable="true"
-            className="neu-surface flex flex-wrap md:flex-nowrap items-center justify-center gap-2 sm:gap-3 px-3.5 py-2.5 rounded-2xl border border-white/[0.05]"
+            className="neu-surface flex flex-wrap lg:flex-nowrap items-center justify-center gap-2 sm:gap-3 px-3.5 py-2.5 rounded-2xl border border-white/[0.05]"
           >
             {/* Selector de pieza */}
             <div className="neu-inset flex items-center gap-1 p-1 rounded-xl" role="group" aria-label="Pieza 3D">
@@ -184,7 +164,7 @@ export function HeroSection() {
                 <button
                   key={item.id}
                   type="button"
-                  onClick={() => handlePieceChange(item.id)}
+                  onClick={() => setPiece(item.id)}
                   aria-pressed={piece === item.id}
                   className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap shrink-0 focus-visible:outline-2 focus-visible:outline-emerald-400 ${
                     piece === item.id
@@ -197,7 +177,7 @@ export function HeroSection() {
               ))}
             </div>
 
-            <span aria-hidden="true" className="hidden sm:block h-5 w-px bg-white/10" />
+            <span aria-hidden="true" className="hidden lg:block h-5 w-px bg-white/10" />
 
             {/* Selector de acabado */}
             <div className="neu-inset flex items-center gap-1 p-1 rounded-xl" role="group" aria-label="Acabado 3D">
@@ -205,7 +185,7 @@ export function HeroSection() {
                 <button
                   key={item.id}
                   type="button"
-                  onClick={() => handleFinishChange(item.id)}
+                  onClick={() => setFinish(item.id)}
                   aria-pressed={finish === item.id}
                   className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap shrink-0 focus-visible:outline-2 focus-visible:outline-emerald-400 ${
                     finish === item.id
@@ -219,13 +199,28 @@ export function HeroSection() {
               ))}
             </div>
 
-            <span aria-hidden="true" className="hidden sm:block h-5 w-px bg-white/10" />
+            <span aria-hidden="true" className="hidden lg:block h-5 w-px bg-white/10" />
 
-            {/* Auto-rotación y reinicio */}
+            {/* Partículas suaves, auto-rotación y reinicio */}
             <div className="flex items-center gap-1.5">
               <button
                 type="button"
-                onClick={handleToggleRotate}
+                onClick={() => setParticlesEnabled((prev) => !prev)}
+                aria-pressed={particlesEnabled}
+                aria-label={particlesEnabled ? 'Ocultar partículas suaves' : 'Mostrar partículas suaves'}
+                className={`neu-btn inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-medium transition-all whitespace-nowrap shrink-0 focus-visible:outline-2 focus-visible:outline-emerald-400 ${
+                  particlesEnabled
+                    ? 'border-emerald-400/25 text-emerald-300'
+                    : 'border-white/[0.05] text-slate-300'
+                }`}
+              >
+                <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Partículas</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setAutoRotate((prev) => !prev)}
                 aria-pressed={autoRotate}
                 aria-label={autoRotate ? 'Pausar rotación automática' : 'Activar rotación automática'}
                 className="neu-btn inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-white/[0.05] text-xs font-medium text-slate-200 hover:border-emerald-400/35 whitespace-nowrap shrink-0 focus-visible:outline-2 focus-visible:outline-emerald-400"
@@ -236,7 +231,7 @@ export function HeroSection() {
 
               <button
                 type="button"
-                onClick={handleResetCamera}
+                onClick={() => setResetSignal((prev) => prev + 1)}
                 aria-label="Restablecer cámara 3D"
                 className="neu-btn inline-flex items-center justify-center w-8 h-8 rounded-xl border border-white/[0.05] text-slate-300 hover:text-white focus-visible:outline-2 focus-visible:outline-emerald-400"
               >
